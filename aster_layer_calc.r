@@ -1,7 +1,73 @@
 #!/usr/bin/env Rscript
 
+############################################################################################################
+# Convert ASTER L1T HDF-EOS VNIR/TIR datasets from Radiance 
+# and  exports  GeoTIFF files.
+# Author: Alfonso Crisci 
+# Contact: a.crisci@ibimet.cnr.it
+# Organization: Istituto di Biometeorologia
+# Date last modified: 24-11-2017
+
+# DESCRIPTION:
+# This script is used for batch processing of ASTER Images
+# The script uses an ASTER L1T HDF-EOS file (.hdf) as the input.
+# It based on the work of Cole Krehbiel
+# https://git.earthdata.nasa.gov/projects/LPDUR/repos/aster-l1t
+
+# USAGE: Rscript aster_layer_calc.r path/filename name_city city type
+
+
+##############################################################################################################
+
+in_dir <- args[1]
+name <- args[2]
+city  <- args[3]
+type  <- args[4]
+
+emis=0.95
+
+message(paste(in_dir,name,city,type))
+
+if (length(args) !=4) {
+                    stop("At least four argument must be supplied (working dir, input file, name of output directory )\n", call.=FALSE)
+} 
+
+
+
+calc_lst=function(rbright,emis=0.92,c2micro=14388,Lwave=10.16,kelvin=F) {
+                  temp=rbright / ( 1 + ( Lwave * (rbright / c2micro)) * log(emis))
+                  if ( kelvin==F) { temp=temp-273.15}
+                  return(temp)
+} 
+
+
+calc_tbright=function(r,band=13) {
+                                  k=band-9
+                                  ucc <- c(0.006822, 0.00678, 0.00659, 0.005693, 0.005225)
+                                  k1 <- c(3024, 2460, 1909, 890, 646.4)
+                                  k2 <- c(1733, 166, 1581, 1357, 1273)
+                                  tir_rad <- ((r - 1) * ucc[k])
+                                  sat_brit <- k2[k]/log((k1[k]/tir_rad) + 1)
+                                  return(sat_brit)
+                                  }
+
+retrieve_aster_hdf=function(file,user='',password="") 
+                           {download.file(url=paste0("http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/",
+                           substr(file,16,19),".",
+                           substr(file,12,13),".",
+                           substr(file,14,15),"/",file,'.hdf'),
+                           destfile=paste0(file,'.hdf'),
+                           method="wget",
+                           extra=paste0("--http-user=",user," --http-password=",password))
+                           }
+
+aster_date_hdf=function(file)  {aster_date=as.Date(paste(substr(file,16,19),substr(file,12,13),substr(file,14,15),sep="-"))
+                               return(aster_date)
+                               }
+
 #############################################################################################################
-# How to Convert ASTER L1T HDF-EOS VNIR/SWIR datasets from Radiance Stor###and  exports as GeoTIFF files.
+# Convert ASTER L1T HDF-EOS VNIR/TIR datasets from Radiance 
+# and  exports as GeoTIFF files.
 #-------------------------------------------------------------------------------
 # Author: Cole Krehbiel
 # Contact: LPDAAC@usgs.gov  
@@ -27,9 +93,7 @@ require(rgdal)
 
 args = commandArgs(trailingOnly=TRUE)
 
-# system(paste0("Rscript aster_layer.r /home/alf/Scrivania/lav_aster_retrieve ",imlist$filename[1]," ",imlist$citta[1])
 
-emis=0.95
 
 #############################################################################################################
 # Set up calculations
@@ -85,50 +149,8 @@ calc_reflectance <- function(x){
                                (pi * x * (earth_sun_dist^2)) / (irradiance1 * sin(pi * sza / 180))
                                }
 
-calc_lst=function(rbright,emis=0.92,c2micro=14388,Lwave=10.16,kelvin=F) {
-                  temp=rbright / ( 1 + ( Lwave * (rbright / c2micro)) * log(emis))
-                  if ( kelvin==F) { temp=temp-273.15}
-                  return(temp)
-} 
 
 
-calc_tbright=function(r,band=13) {
-                                  k=band-9
-                                  ucc <- c(0.006822, 0.00678, 0.00659, 0.005693, 0.005225)
-                                  k1 <- c(3024, 2460, 1909, 890, 646.4)
-                                  k2 <- c(1733, 166, 1581, 1357, 1273)
-                                  tir_rad <- ((r - 1) * ucc[k])
-                                  sat_brit <- k2[k]/log((k1[k]/tir_rad) + 1)
-                                  return(sat_brit)
-                                  }
-
-retrieve_aster_hdf=function(file,user='',password="") 
-                           {download.file(url=paste0("http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/",
-                           substr(file,16,19),".",
-                           substr(file,12,13),".",
-                           substr(file,14,15),"/",file,'.hdf'),
-                           destfile=paste0(file,'.hdf'),
-                           method="wget",
-                           extra=paste0("--http-user=",user," --http-password=",password))
-                           }
-
-aster_date_hdf=function(file)  {aster_date=as.Date(paste(substr(file,16,19),substr(file,12,13),substr(file,14,15),sep="-"))
-                               return(aster_date)
-                               }
-
-
-
-#############################################################################################################
-in_dir <- args[1]
-name <- args[2]
-city  <- args[3]
-type  <- args[4]
-
-message(paste(in_dir,name,city,type))
-
-if (length(args) !=4) {
-                    stop("At least four argument must be supplied (working dir, input file, name of output directory )\n", call.=FALSE)
-} 
 
 
 
